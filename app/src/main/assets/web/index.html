@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LocalDrop - Wi-Fi File Manager</title>
+  <style>
+    :root {
+      --bg-dark: #FEF7FF;
+      --surface-dark: #FEF7FF;
+      --surface-card: #FFFFFF;
+      --surface-elevated: #F3EDF7;
+      --primary: #6750A4;
+      --primary-variant: #523D8A;
+      --accent-green: #10B981;
+      --accent-amber: #F59E0B;
+      --accent-red: #B3261E;
+      --text-main: #1D1B20;
+      --text-muted: #49454F;
+      --border-color: #CAC4D0;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      background: var(--surface-dark);
+      border-bottom: 1px solid var(--border-color);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .brand-icon {
+      width: 36px;
+      height: 36px;
+      background: rgba(0, 229, 255, 0.15);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--primary);
+    }
+    .brand h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    .device-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--surface-elevated);
+      padding: 0.35rem 0.85rem;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-green);
+      box-shadow: 0 0 8px var(--accent-green);
+    }
+    main {
+      flex: 1;
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    /* Drop Zone */
+    .dropzone {
+      border: 2px dashed rgba(0, 229, 255, 0.4);
+      background: rgba(28, 37, 65, 0.6);
+      border-radius: 16px;
+      padding: 2.5rem 1.5rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+    .dropzone:hover, .dropzone.dragover {
+      border-color: var(--primary);
+      background: rgba(0, 229, 255, 0.08);
+      transform: translateY(-2px);
+    }
+    .dropzone-icon {
+      font-size: 2.8rem;
+      margin-bottom: 0.5rem;
+    }
+    .dropzone h3 {
+      font-size: 1.1rem;
+      margin-bottom: 0.25rem;
+    }
+    .dropzone p {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+    #fileInput {
+      display: none;
+    }
+
+    /* Toolbar */
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .breadcrumbs {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.95rem;
+      background: var(--surface-card);
+      padding: 0.5rem 1rem;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+    }
+    .breadcrumb-item {
+      cursor: pointer;
+      color: var(--primary);
+      text-decoration: none;
+    }
+    .breadcrumb-item:hover {
+      text-decoration: underline;
+    }
+    .breadcrumb-sep {
+      color: var(--text-muted);
+    }
+    .actions {
+      display: flex;
+      gap: 0.75rem;
+    }
+    .btn {
+      background: var(--surface-elevated);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.15s ease;
+    }
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+    .btn-primary {
+      background: var(--primary);
+      color: #0b132b;
+      border: none;
+    }
+    .btn-primary:hover {
+      background: var(--primary-variant);
+    }
+
+    /* File Table / Grid */
+    .file-container {
+      background: var(--surface-card);
+      border-radius: 16px;
+      border: 1px solid var(--border-color);
+      overflow: hidden;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.9rem;
+    }
+    th {
+      background: var(--surface-dark);
+      padding: 0.85rem 1.25rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      border-bottom: 1px solid var(--border-color);
+    }
+    td {
+      padding: 0.85rem 1.25rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      vertical-align: middle;
+    }
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .file-name-cell {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-weight: 500;
+    }
+    .file-icon {
+      font-size: 1.25rem;
+    }
+    .clickable {
+      cursor: pointer;
+      color: var(--text-main);
+      text-decoration: none;
+    }
+    .clickable:hover {
+      color: var(--primary);
+    }
+    .action-icons {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: flex-end;
+    }
+    .btn-icon {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 0.35rem;
+      border-radius: 6px;
+      font-size: 1rem;
+      transition: all 0.15s ease;
+    }
+    .btn-icon:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text-main);
+    }
+    .btn-icon.delete:hover {
+      color: var(--accent-red);
+    }
+
+    /* Active Transfers Panel */
+    .transfers-panel {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      width: 360px;
+      background: var(--surface-card);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .transfers-header {
+      background: var(--surface-dark);
+      padding: 0.75rem 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-color);
+      font-weight: 600;
+      font-size: 0.85rem;
+    }
+    .transfers-list {
+      max-height: 250px;
+      overflow-y: auto;
+      padding: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .transfer-row {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      font-size: 0.8rem;
+    }
+    .transfer-bar-bg {
+      background: rgba(255, 255, 255, 0.1);
+      height: 6px;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .transfer-bar-fill {
+      height: 100%;
+      background: var(--primary);
+      width: 0%;
+      transition: width 0.1s ease;
+    }
+
+    /* PIN Modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+    }
+    .modal-card {
+      background: var(--surface-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 2rem;
+      width: 90%;
+      max-width: 400px;
+      text-align: center;
+    }
+    .pin-inputs {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+      margin: 1.5rem 0;
+    }
+    .pin-input {
+      width: 48px;
+      height: 56px;
+      background: var(--surface-elevated);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      color: var(--primary);
+      font-size: 1.5rem;
+      font-weight: 700;
+      text-align: center;
+      outline: none;
+    }
+    .pin-input:focus {
+      border-color: var(--primary);
+    }
+    .error-msg {
+      color: var(--accent-red);
+      font-size: 0.85rem;
+      margin-top: 0.5rem;
+      display: none;
+    }
+
+    /* Toast Notification */
+    .toast {
+      position: fixed;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--surface-elevated);
+      border: 1px solid var(--border-color);
+      padding: 0.75rem 1.5rem;
+      border-radius: 30px;
+      font-size: 0.85rem;
+      display: none;
+      z-index: 3000;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+    }
+
+    /* Preview Modal */
+    .preview-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.85);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2500;
+      padding: 1.5rem;
+    }
+    .preview-content {
+      max-width: 90vw;
+      max-height: 85vh;
+      border-radius: 8px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .preview-close {
+      position: absolute;
+      top: 1rem;
+      right: 1.5rem;
+      background: rgba(0, 0, 0, 0.5);
+      border: none;
+      color: white;
+      font-size: 1.5rem;
+      cursor: pointer;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="brand-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+        </svg>
+      </div>
+      <div>
+        <h1>LocalDrop</h1>
+      </div>
+    </div>
+    <div class="device-badge">
+      <div class="status-dot"></div>
+      <span id="deviceNameLabel">{{DEVICE_NAME}}</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- Drag & Drop Zone -->
+    <div class="dropzone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+      <div class="dropzone-icon">📤</div>
+      <h3>Drag & drop files or folders here</h3>
+      <p>Click to browse from this PC. Files upload directly over local Wi-Fi.</p>
+      <input type="file" id="fileInput" multiple onchange="handleFileSelect(event)">
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <div class="breadcrumbs" id="breadcrumbBar">
+        <span class="breadcrumb-item" onclick="navigateToFolder('')">Home</span>
+      </div>
+
+      <div class="actions">
+        <button class="btn" onclick="promptNewFolder()">
+          <span>📁</span> New Folder
+        </button>
+        <button class="btn" onclick="downloadAllZip()">
+          <span>📦</span> Download All as ZIP
+        </button>
+        <button class="btn btn-primary" onclick="loadFiles()">
+          <span>🔄</span> Refresh
+        </button>
+      </div>
+    </div>
+
+    <!-- File Table -->
+    <div class="file-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Size</th>
+            <th>Modified</th>
+            <th style="text-align: right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="fileListBody">
+          <tr>
+            <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 3rem;">
+              Loading files from phone...
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <!-- Active Transfers Floating Panel -->
+  <div class="transfers-panel" id="transfersPanel">
+    <div class="transfers-header">
+      <span>Transfers</span>
+      <span id="transfersCount" style="color: var(--primary);">0</span>
+    </div>
+    <div class="transfers-list" id="transfersList"></div>
+  </div>
+
+  <!-- PIN Modal -->
+  <div class="modal-overlay" id="pinModal">
+    <div class="modal-card">
+      <h2>Security PIN Required</h2>
+      <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.5rem;">
+        Check your phone screen for the 4-digit LocalDrop access PIN:
+      </p>
+      <div class="pin-inputs">
+        <input type="password" maxlength="1" class="pin-input" id="p1" oninput="onPinInput(1)">
+        <input type="password" maxlength="1" class="pin-input" id="p2" oninput="onPinInput(2)">
+        <input type="password" maxlength="1" class="pin-input" id="p3" oninput="onPinInput(3)">
+        <input type="password" maxlength="1" class="pin-input" id="p4" oninput="onPinInput(4)">
+      </div>
+      <button class="btn btn-primary" style="width: 100%; justify-content: center; padding: 0.75rem;" onclick="submitPin()">
+        Connect to Phone
+      </button>
+      <div class="error-msg" id="pinError">Invalid PIN code. Please try again.</div>
+    </div>
+  </div>
+
+  <!-- Preview Modal -->
+  <div class="preview-modal" id="previewModal">
+    <button class="preview-close" onclick="closePreview()">✕</button>
+    <div class="preview-content" id="previewContent"></div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let currentFolder = '';
+    let authToken = localStorage.getItem('localdrop_token') || '';
+    const pinRequired = {{PIN_REQUIRED}};
+
+    // Check query param for auto-pin
+    const urlParams = new URLSearchParams(window.location.search);
+    const pinParam = urlParams.get('pin');
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      setupDropZone();
+      if (pinParam) {
+        await verifyPin(pinParam);
+      } else if (pinRequired && !authToken) {
+        showPinModal();
+      } else {
+        loadFiles();
+      }
+    });
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.innerText = msg;
+      toast.style.display = 'block';
+      setTimeout(() => { toast.style.display = 'none'; }, 3000);
+    }
+
+    function showPinModal() {
+      document.getElementById('pinModal').style.display = 'flex';
+      document.getElementById('p1').focus();
+    }
+
+    function onPinInput(idx) {
+      const curr = document.getElementById('p' + idx);
+      if (curr.value && idx < 4) {
+        document.getElementById('p' + (idx + 1)).focus();
+      }
+      if (idx === 4 && curr.value) {
+        submitPin();
+      }
+    }
+
+    async function submitPin() {
+      const p1 = document.getElementById('p1').value;
+      const p2 = document.getElementById('p2').value;
+      const p3 = document.getElementById('p3').value;
+      const p4 = document.getElementById('p4').value;
+      const pin = p1 + p2 + p3 + p4;
+      await verifyPin(pin);
+    }
+
+    async function verifyPin(pin) {
+      try {
+        const res = await fetch('/api/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin: pin })
+        });
+        const data = await res.json();
+        if (data.success) {
+          authToken = data.token;
+          localStorage.setItem('localdrop_token', authToken);
+          document.getElementById('pinModal').style.display = 'none';
+          loadFiles();
+        } else {
+          document.getElementById('pinError').style.display = 'block';
+        }
+      } catch (e) {
+        document.getElementById('pinError').innerText = 'Connection error. Check Wi-Fi.';
+        document.getElementById('pinError').style.display = 'block';
+      }
+    }
+
+    function getHeaders() {
+      const h = {};
+      if (authToken) {
+        h['X-Auth-Token'] = authToken;
+      }
+      return h;
+    }
+
+    async function loadFiles() {
+      try {
+        const res = await fetch('/api/files?folder=' + encodeURIComponent(currentFolder), {
+          headers: getHeaders()
+        });
+        if (res.status === 401) {
+          showPinModal();
+          return;
+        }
+        const files = await res.json();
+        renderFiles(files);
+        updateBreadcrumbs();
+      } catch (e) {
+        console.error(e);
+        document.getElementById('fileListBody').innerHTML = `
+          <tr>
+            <td colspan="4" style="text-align:center; color: var(--accent-red); padding: 2rem;">
+              Failed to connect to phone server. Ensure both devices are on the same Wi-Fi.
+            </td>
+          </tr>`;
+      }
+    }
+
+    function renderFiles(files) {
+      const tbody = document.getElementById('fileListBody');
+      if (!files || files.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 3rem;">
+              No files in this folder. Drop files above to upload!
+            </td>
+          </tr>`;
+        return;
+      }
+
+      tbody.innerHTML = '';
+      files.forEach(f => {
+        const tr = document.createElement('tr');
+        const icon = getFileIcon(f);
+
+        tr.innerHTML = `
+          <td>
+            <div class="file-name-cell">
+              <span class="file-icon">${icon}</span>
+              ${f.isDirectory 
+                ? `<span class="clickable" onclick="navigateToFolder('${f.relativePath}')"><strong>${escapeHtml(f.name)}</strong></span>`
+                : `<span class="clickable" onclick="previewOrDownload('${f.relativePath}', '${f.extension}')">${escapeHtml(f.name)}</span>`
+              }
+            </div>
+          </td>
+          <td>${f.isDirectory ? '--' : formatBytes(f.size)}</td>
+          <td>${formatDate(f.lastModified)}</td>
+          <td>
+            <div class="action-icons">
+              ${f.isDirectory
+                ? `<button class="btn-icon" title="Download ZIP" onclick="downloadFolderZip('${f.relativePath}')">📦</button>`
+                : `<button class="btn-icon" title="Download" onclick="downloadFile('${f.relativePath}')">⬇️</button>`
+              }
+              <button class="btn-icon delete" title="Delete" onclick="deleteFile('${f.relativePath}')">🗑️</button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function getFileIcon(f) {
+      if (f.isDirectory) return '📁';
+      const ext = (f.extension || '').toLowerCase();
+      if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'].includes(ext)) return '🖼️';
+      if (['mp4', 'mkv', 'avi', 'mov', 'webm'].includes(ext)) return '🎬';
+      if (['mp3', 'wav', 'flac', 'ogg', 'm4a'].includes(ext)) return '🎵';
+      if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) return '📦';
+      if (['pdf', 'doc', 'docx', 'txt', 'md'].includes(ext)) return '📄';
+      return '📄';
+    }
+
+    function formatBytes(bytes) {
+      if (!bytes || bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    function formatDate(ts) {
+      if (!ts) return '--';
+      const d = new Date(ts);
+      return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function navigateToFolder(path) {
+      currentFolder = path;
+      loadFiles();
+    }
+
+    function updateBreadcrumbs() {
+      const bar = document.getElementById('breadcrumbBar');
+      bar.innerHTML = '<span class="breadcrumb-item" onclick="navigateToFolder(\'\')">Home</span>';
+      if (!currentFolder) return;
+
+      const parts = currentFolder.split('/');
+      let accumulated = '';
+      parts.forEach(part => {
+        if (!part) return;
+        accumulated += (accumulated ? '/' : '') + part;
+        const target = accumulated;
+        bar.innerHTML += `
+          <span class="breadcrumb-sep">/</span>
+          <span class="breadcrumb-item" onclick="navigateToFolder('${target}')">${escapeHtml(part)}</span>
+        `;
+      });
+    }
+
+    function downloadFile(relPath) {
+      const url = '/api/download?file=' + encodeURIComponent(relPath) + (authToken ? '&token=' + encodeURIComponent(authToken) : '');
+      window.location.href = url;
+    }
+
+    function downloadFolderZip(folderPath) {
+      const url = '/api/download-zip?folder=' + encodeURIComponent(folderPath) + (authToken ? '&token=' + encodeURIComponent(authToken) : '');
+      window.location.href = url;
+    }
+
+    function downloadAllZip() {
+      const url = '/api/download-zip?folder=' + encodeURIComponent(currentFolder) + (authToken ? '&token=' + encodeURIComponent(authToken) : '');
+      window.location.href = url;
+    }
+
+    function previewOrDownload(relPath, ext) {
+      const lowerExt = (ext || '').toLowerCase();
+      if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(lowerExt)) {
+        const url = '/api/preview?file=' + encodeURIComponent(relPath) + (authToken ? '&token=' + encodeURIComponent(authToken) : '');
+        document.getElementById('previewContent').innerHTML = `<img src="${url}" style="max-width:100%; max-height:80vh; object-fit:contain;">`;
+        document.getElementById('previewModal').style.display = 'flex';
+      } else if (['mp4', 'webm'].includes(lowerExt)) {
+        const url = '/api/preview?file=' + encodeURIComponent(relPath) + (authToken ? '&token=' + encodeURIComponent(authToken) : '');
+        document.getElementById('previewContent').innerHTML = `<video src="${url}" controls autoplay style="max-width:100%; max-height:80vh;"></video>`;
+        document.getElementById('previewModal').style.display = 'flex';
+      } else if (['mp3', 'wav', 'ogg'].includes(lowerExt)) {
+        const url = '/api/preview?file=' + encodeURIComponent(relPath) + (authToken ? '&token=' + encodeURIComponent(authToken) : '');
+        document.getElementById('previewContent').innerHTML = `<audio src="${url}" controls autoplay style="width:320px;"></audio>`;
+        document.getElementById('previewModal').style.display = 'flex';
+      } else {
+        downloadFile(relPath);
+      }
+    }
+
+    function closePreview() {
+      document.getElementById('previewModal').style.display = 'none';
+      document.getElementById('previewContent').innerHTML = '';
+    }
+
+    async function deleteFile(relPath) {
+      if (!confirm('Are you sure you want to delete this?')) return;
+      try {
+        const res = await fetch('/api/delete', {
+          method: 'POST',
+          headers: { ...getHeaders(), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: relPath })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('Deleted successfully');
+          loadFiles();
+        } else {
+          alert('Delete failed: ' + (data.message || 'Error'));
+        }
+      } catch (e) {
+        alert('Delete failed: ' + e.message);
+      }
+    }
+
+    async function promptNewFolder() {
+      const name = prompt('Enter new folder name:');
+      if (!name) return;
+      try {
+        const res = await fetch('/api/mkdir', {
+          method: 'POST',
+          headers: { ...getHeaders(), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ folder: currentFolder, name: name })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('Folder created');
+          loadFiles();
+        } else {
+          alert('Failed to create folder: ' + (data.message || 'Error'));
+        }
+      } catch (e) {
+        alert('Failed to create folder');
+      }
+    }
+
+    // Drag & Drop Setup
+    function setupDropZone() {
+      const zone = document.getElementById('dropZone');
+      ['dragenter', 'dragover'].forEach(eName => {
+        zone.addEventListener(eName, e => {
+          e.preventDefault();
+          e.stopPropagation();
+          zone.classList.add('dragover');
+        });
+      });
+      ['dragleave', 'drop'].forEach(eName => {
+        zone.addEventListener(eName, e => {
+          e.preventDefault();
+          e.stopPropagation();
+          zone.classList.remove('dragover');
+        });
+      });
+      zone.addEventListener('drop', e => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        handleFiles(files);
+      });
+    }
+
+    function handleFileSelect(e) {
+      handleFiles(e.target.files);
+    }
+
+    function handleFiles(files) {
+      if (!files || files.length === 0) return;
+      for (let i = 0; i < files.length; i++) {
+        uploadFile(files[i]);
+      }
+    }
+
+    function uploadFile(file) {
+      const uploadPath = currentFolder ? currentFolder + '/' + file.name : file.name;
+      const transferId = 't_' + Math.random().toString(36).substring(2, 9);
+
+      addTransferUi(transferId, file.name, file.size);
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/upload?path=' + encodeURIComponent(uploadPath), true);
+      if (authToken) {
+        xhr.setRequestHeader('X-Auth-Token', authToken);
+      }
+
+      let startTime = Date.now();
+      let lastBytes = 0;
+
+      xhr.upload.onprogress = e => {
+        if (e.lengthComputable) {
+          const percent = Math.round((e.loaded / e.total) * 100);
+          const elapsed = (Date.now() - startTime) / 1000;
+          const speed = elapsed > 0 ? (e.loaded / elapsed) : 0;
+          updateTransferUi(transferId, percent, e.loaded, e.total, speed);
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          finishTransferUi(transferId, true);
+          showToast('Uploaded: ' + file.name);
+          loadFiles();
+        } else {
+          finishTransferUi(transferId, false);
+          showToast('Failed to upload ' + file.name);
+        }
+      };
+
+      xhr.onerror = () => {
+        finishTransferUi(transferId, false);
+        showToast('Upload network error: ' + file.name);
+      };
+
+      xhr.send(file);
+    }
+
+    // Transfers Panel UI helpers
+    let activeTransferCount = 0;
+    function addTransferUi(id, name, size) {
+      activeTransferCount++;
+      const panel = document.getElementById('transfersPanel');
+      panel.style.display = 'flex';
+      document.getElementById('transfersCount').innerText = activeTransferCount;
+
+      const list = document.getElementById('transfersList');
+      const div = document.createElement('div');
+      div.id = id;
+      div.className = 'transfer-row';
+      div.innerHTML = `
+        <div style="display:flex; justify-content:space-between;">
+          <strong style="max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(name)}</strong>
+          <span id="${id}_pct" style="color:var(--primary);">0%</span>
+        </div>
+        <div class="transfer-bar-bg">
+          <div class="transfer-bar-fill" id="${id}_bar"></div>
+        </div>
+        <div style="display:flex; justify-content:space-between; color:var(--text-muted); font-size:0.75rem;">
+          <span id="${id}_status">0 / ${formatBytes(size)}</span>
+          <span id="${id}_speed">0 KB/s</span>
+        </div>
+      `;
+      list.appendChild(div);
+    }
+
+    function updateTransferUi(id, pct, loaded, total, speed) {
+      const bar = document.getElementById(id + '_bar');
+      const pctLabel = document.getElementById(id + '_pct');
+      const statusLabel = document.getElementById(id + '_status');
+      const speedLabel = document.getElementById(id + '_speed');
+
+      if (bar) bar.style.width = pct + '%';
+      if (pctLabel) pctLabel.innerText = pct + '%';
+      if (statusLabel) statusLabel.innerText = formatBytes(loaded) + ' / ' + formatBytes(total);
+      if (speedLabel) speedLabel.innerText = formatBytes(speed) + '/s';
+    }
+
+    function finishTransferUi(id, success) {
+      activeTransferCount = Math.max(0, activeTransferCount - 1);
+      document.getElementById('transfersCount').innerText = activeTransferCount;
+      const row = document.getElementById(id);
+      if (row) {
+        const pctLabel = document.getElementById(id + '_pct');
+        const speedLabel = document.getElementById(id + '_speed');
+        if (success) {
+          if (pctLabel) { pctLabel.innerText = 'Done'; pctLabel.style.color = 'var(--accent-green)'; }
+          if (speedLabel) speedLabel.innerText = 'Completed';
+        } else {
+          if (pctLabel) { pctLabel.innerText = 'Failed'; pctLabel.style.color = 'var(--accent-red)'; }
+          if (speedLabel) speedLabel.innerText = 'Error';
+        }
+        setTimeout(() => {
+          row.remove();
+          if (activeTransferCount === 0) {
+            document.getElementById('transfersPanel').style.display = 'none';
+          }
+        }, 4000);
+      }
+    }
+  </script>
+</body>
+</html>

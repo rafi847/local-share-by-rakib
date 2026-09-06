@@ -1,0 +1,6 @@
+{
+  "name": "LocalDrop",
+  "description": "Wi-Fi local file transfer server and client with QR pairing, browser access, and secure local file management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
